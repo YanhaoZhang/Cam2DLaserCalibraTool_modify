@@ -1,0 +1,33 @@
+%YAML:1.0
+
+#common parameters
+savePath: "/home/yanhao/LaserCameraCal_ws/data/"
+bag_path: "/home/yanhao/LaserCameraCal_ws/data/2019-10-18-15-28-41.bag"
+
+scan_topic_name: "/scan"
+img_topic_name: "/camera/image_raw"
+
+# tag info
+tag_type: 1 # 1: kalibr_tag, 2: apriltag
+tag_size: 0.04520 # tag size, unit meter
+tag_spacing: 0.3 # tag spacing, only used in kalibr_tag. For details, please see kalibr tag description.
+black_border: 2 # if you use kalibr_tag black_boarder = 2; if you use apriltag black_boarder = 1
+
+#camera calibration 
+model_type: PINHOLE
+camera_name: camera
+image_width: 1024
+image_height: 768
+
+distortion_parameters:
+   k1: -0.347530
+   k2: 0.086974
+   p1: -0.000544
+   p2: 0.001048
+
+projection_parameters:
+   fx: 561.032846
+   fy: 562.566261
+   cx: 513.892890
+   cy: 392.143808
+

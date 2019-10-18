@@ -1,0 +1,7 @@
+# Yanhao20191018:
+# ignore files end with ~ (matlab temp file)
+*~
+
+# clion
+cmake-build-debug/
+.idea/
