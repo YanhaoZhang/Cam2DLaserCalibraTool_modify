@@ -2,14 +2,14 @@
 
 #common parameters
 savePath: "/home/yanhao/LaserCameraCal_ws/data/"
-bag_path: "/home/yanhao/LaserCameraCal_ws/data/2019-10-15-20-12-05.bag"
+bag_path: "/home/yanhao/LaserCameraCal_ws/kalibr/2019-10-25-10-42-16.bag"
 
 scan_topic_name: "/scan"
 img_topic_name: "/camera/image_raw"
 
 # tag info
 tag_type: 1 # 1: kalibr_tag, 2: apriltag
-tag_size: 0.0451 # tag size, unit meter
+tag_size: 0.04520 # tag size, unit meter
 tag_spacing: 0.3 # tag spacing, only used in kalibr_tag. For details, please see kalibr tag description.
 black_border: 2 # if you use kalibr_tag black_boarder = 2; if you use apriltag black_boarder = 1
  
@@ -20,12 +20,12 @@ image_width: 2048
 image_height: 1536
 
 projection_parameters:
-   mu: 1115.3458479831127
-   mv: 1115.5680569978117
-   u0: 1047.8994454164401
-   v0: 775.5928959466218
-   k2: -0.39561955371546687
-   k3: 0.14301415731672948
-   k4: -0.00091786036772837
-   k5: -0.0011805174547034807
+   mu: 1246.8495683939059
+   mv: 1246.6796637158143
+   u0: 1069.1627321989956
+   v0: 754.0760724433161
+   k2: -0.07579316438503815
+   k3: 0.0075718549843870895
+   k4: -0.01227477546119867
+   k5: 0.005448728538662765
 

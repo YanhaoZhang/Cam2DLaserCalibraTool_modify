@@ -21,8 +21,8 @@ private:
 
 public:
     PointInPlaneFactor(Eigen::Vector4d planar,    // planar
-    Eigen::Vector3d point)   // point
-    : planar_(planar),point_(point)
+                       Eigen::Vector3d point)   // point
+            : planar_(planar),point_(point)
     {}
 
     virtual bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const;
@@ -59,6 +59,34 @@ bool PointInPlaneFactor::Evaluate(double const *const *parameters, double *resid
     }
 
     return true;
+}
+
+
+// new cost function by yanhao
+// this is for aditional constraint for 2D
+class PointInPlaneFactor2D: public ceres::SizedCostFunction<1,3>
+{
+private:
+    Eigen::Vector4d planar_;
+    Eigen::Vector3d point_;
+    Eigen::Matrix3d Rcl_;
+    Eigen::Vector3d tcl_;
+
+public:
+    PointInPlaneFactor2D(Eigen::Vector4d planar,    // planar
+                       Eigen::Vector3d point,       // point
+                         Eigen::Matrix3d Rcl,Eigen::Vector3d tcl)
+            : planar_(planar),point_(point), Rcl_(Rcl), tcl_(tcl)
+    {}
+
+    virtual bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const;
+};
+
+bool PointInPlaneFactor2D::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const {
+    Eigen::Vector3d tcl(parameters[0][0], parameters[0][1], 0.0);  // x y 0
+    tcl += tcl_;
+    Eigen::Quaterniond qcl(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]);
+
 }
 
 void CalibrationTool_SavePlanePoints(const std::vector<Oberserve> obs, const Eigen::Matrix4d Tcl, const std::string path)
@@ -128,11 +156,11 @@ void CamLaserCalibration(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tcl,
         Oberserve obi = obs[i];
         // transform planar in tag frame to cam frame
 //        https://stackoverflow.com/questions/7685495/transforming-a-3d-plane-using-a-4x4-matrix
-        Eigen::Vector4d planar_tag(0,0,1,0);  // tag 坐标系下的平面方程
-        Eigen::Matrix4d Tctag = Eigen::Matrix4d::Identity();
+        Eigen::Vector4d planar_tag(0,0,1,0);  // tag 坐标系下的平面方程:   0x + 0y + 1z + 0 = 0, namely z has to be zero
+        Eigen::Matrix4d Tctag = Eigen::Matrix4d::Identity();   // 初始化　表示相机坐标系下 tag (标定板) 的变换矩阵，相机坐标系是原点
         Tctag.block(0,0,3,3) = obi.tagPose_Qca.toRotationMatrix();
         Tctag.block(0,3,3,1) = obi.tagPose_tca;
-        Eigen::Vector4d planar_cam = (Tctag.inverse()).transpose() * planar_tag;
+        Eigen::Vector4d planar_cam = (Tctag.inverse()).transpose() * planar_tag;    // 这个平面方程在相机坐标系下　 p_new = (T.inverst).transpose * p_old, where p = (a b c d)' is the planer function parameter
 
         std::vector<Eigen::Vector3d> calibra_pts;
         if(use_linefitting_data)
@@ -143,32 +171,75 @@ void CamLaserCalibration(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tcl,
         for (size_t j = 0; j < calibra_pts.size(); ++j) {
             Eigen::Vector3d pt =  calibra_pts[j];
 
-            PointInPlaneFactor *costfunction = new PointInPlaneFactor(planar_cam, pt);
+            PointInPlaneFactor *costfunction = new PointInPlaneFactor(planar_cam, pt);    //　这个观测就是根据相机坐标系下tag的平面方程和标定板上的点做的 它们是观测
 
 #ifdef LOSSFUNCTION
             //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
             ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.1);
-            problem.AddResidualBlock(costfunction, loss_function, pose.data());
+            problem.AddResidualBlock(costfunction, loss_function, pose.data());           // 把观测加到方程中
 #else
             problem.AddResidualBlock(costfunction, NULL, pose.data());
 #endif
         }
 
+        // yanhao changed
         // boundary plane constraint
         // 边界约束：每帧激光只利用两个激光点时才用边界约束，不然边界约束权重太小。
         if(use_boundary_constraint && use_linefitting_data)
         {
+//            std::cout<< "Yanhao: Check: use_linefitting_data \n" <<std::endl;
+
             // plane pi from ith obs in ith camera frame, 计算标定板边界和相机光心所构建的平面
             // 标定板边界三个定点在标定板坐标系中的坐标
-
 //            length of check board
 //            x1 195.2
 //            b  135.6
 //            a  452.0
 //            x2 146.0
-//
 //            y1 266.8
+//            b
+//            a
 //            y2 152.0
+            Eigen::Vector3d orig(0.01952+0.01356,0.02668+0.01356,0);
+            Eigen::Vector3d p1m( 0, 0, 0);
+            Eigen::Vector3d p2m( 0.40024, 0, 0);
+            Eigen::Vector3d p3m( 0., 0.408, 0);
+            p1m -= orig;
+            p2m -= orig;
+            p3m -= orig;
+            // 旋转到相机坐标系
+            Eigen::Vector3d p1c = obi.tagPose_Qca.toRotationMatrix() * p1m +  obi.tagPose_tca;
+            Eigen::Vector3d p2c = obi.tagPose_Qca.toRotationMatrix() * p2m +  obi.tagPose_tca;
+            Eigen::Vector3d p3c = obi.tagPose_Qca.toRotationMatrix() * p3m +  obi.tagPose_tca;
+
+            // 得到平面方程
+            Eigen::Vector4d pi1 = pi_from_ppp(p1c, p2c,Eigen::Vector3d( 0, 0, 0 ));
+            Eigen::Vector4d pi2 = pi_from_ppp(p1c, p3c,Eigen::Vector3d( 0, 0, 0 ));
+
+            Eigen::Vector3d pt1 =  obi.points.at(0);
+            Eigen::Vector3d pt2 =  obi.points.at(obi.points.size()-1);
+//            std::cout << " " <<pt1.dot(pi1.head(3))<<std::endl;
+
+            PointInPlaneFactor *costfunction1 = new PointInPlaneFactor(pi1, pt1);
+            PointInPlaneFactor *costfunction2 = new PointInPlaneFactor(pi2, pt2);
+
+#ifdef LOSSFUNCTION
+            //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
+            ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.1);
+            problem.AddResidualBlock(costfunction1, loss_function, pose.data());
+            problem.AddResidualBlock(costfunction2, loss_function, pose.data());
+
+#else
+            problem.AddResidualBlock(costfunction1, NULL, pose.data());
+            problem.AddResidualBlock(costfunction2, NULL, pose.data());
+#endif
+        }
+
+
+        // Yanhao: 还有个解决办法：多加约束，每个点都加上边界约束　这样权重就够了
+        if(use_boundary_constraint && (!use_linefitting_data)){
+
+//            std::cout<< "Yanhao: Check: ! use_linefitting_data \n" <<std::endl;
 
             Eigen::Vector3d orig(0.01952+0.01356,0.02668+0.01356,0);
             Eigen::Vector3d p1m( 0, 0, 0);
@@ -189,20 +260,41 @@ void CamLaserCalibration(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tcl,
             Eigen::Vector3d pt1 =  obi.points.at(0);
             Eigen::Vector3d pt2 =  obi.points.at(obi.points.size()-1);
 //            std::cout << " " <<pt1.dot(pi1.head(3))<<std::endl;
-            PointInPlaneFactor *costfunction1 = new PointInPlaneFactor(pi1, pt1);
-            PointInPlaneFactor *costfunction2 = new PointInPlaneFactor(pi2, pt2);
+
+
+            float num_for_bondaryconstraint = 0.5; //　这是为了加上足够多的约束
+            for (size_t j = 0; j < (int) num_for_bondaryconstraint*calibra_pts.size(); ++j) {
+                PointInPlaneFactor *costfunction1 = new PointInPlaneFactor(pi1, pt1);
+                PointInPlaneFactor *costfunction2 = new PointInPlaneFactor(pi2, pt2);
 
 #ifdef LOSSFUNCTION
-            //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
-            ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.1);
-            problem.AddResidualBlock(costfunction1, loss_function, pose.data());
-            problem.AddResidualBlock(costfunction2, loss_function, pose.data());
-
+                //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
+                ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.1);
+                problem.AddResidualBlock(costfunction1, loss_function, pose.data());
+                problem.AddResidualBlock(costfunction2, loss_function, pose.data());
 #else
-            problem.AddResidualBlock(costfunction1, NULL, pose.data());
-            problem.AddResidualBlock(costfunction2, NULL, pose.data());
+                problem.AddResidualBlock(costfunction1, NULL, pose.data());
+                problem.AddResidualBlock(costfunction2, NULL, pose.data());
 #endif
+            }
         }
+
+
+        // add constraint for only optimizing 2D
+        bool only_opt_2D = false;
+        float num_for_2Dweight = 10; //　这是为了加上足够多的约束
+        if(only_opt_2D) {
+            for (size_t j = 0; j < (int) num_for_2Dweight*calibra_pts.size(); ++j) {
+
+
+
+
+
+
+            }
+        }
+
+
     }
 
 //    ceres::LocalParameterization* quaternionParameterization = new ceres::QuaternionParameterization;
@@ -293,7 +385,7 @@ struct LineFittingResidfual {
 
     template <typename T>
     bool operator()(const T* const m, T* residual) const {
-        residual[0] = m[0] * T(x_) + m[1] * T(y_) + T(1.);
+        residual[0] = m[0] * T(x_) + m[1] * T(y_) + T(1.);   // 不懂这个意思
         return true;
     }
 
@@ -305,7 +397,7 @@ private:
 
 void LineFittingCeres(const std::vector<Eigen::Vector3d> Points, Eigen::Vector2d & Line)
 {
-    double line[3] = {Line(0),Line(1)};
+    double line[3] = {Line(0),Line(1)};    // 为什么是3呢　3D吗?
 
     ceres::Problem problem;
     for(size_t i = 0; i< Points.size(); ++i)
@@ -317,11 +409,11 @@ void LineFittingCeres(const std::vector<Eigen::Vector3d> Points, Eigen::Vector2d
                         new LineFittingResidfual(obi.x(),obi.y()));
 
 #ifdef LOSSFUNCTION
-            //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
-            ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.05);
-            problem.AddResidualBlock(costfunction, loss_function, line);
+        //ceres::LossFunctionWrapper* loss_function(new ceres::HuberLoss(1.0), ceres::TAKE_OWNERSHIP);
+        ceres::LossFunction * loss_function = new ceres::CauchyLoss(0.05);
+        problem.AddResidualBlock(costfunction, loss_function, line);
 #else
-            problem.AddResidualBlock(costfunction, NULL, line);
+        problem.AddResidualBlock(costfunction, NULL, line);
 #endif
     }
 

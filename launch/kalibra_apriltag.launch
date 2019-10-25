@@ -1,7 +1,7 @@
 <!-- -->
 
 <launch>
-  <arg name="config_path" default = "$(find lasercamcal_ros)/config/calibra_config_pinhole.yaml" />
+  <arg name="config_path" default = "$(find lasercamcal_ros)/config/calibra_config.yaml" />
 
   <node pkg="lasercamcal_ros" type="kalibra_detect_node" name="kalibra_detect_node" output="screen">
     <!-- Remap topic required by the node to custom topics -->

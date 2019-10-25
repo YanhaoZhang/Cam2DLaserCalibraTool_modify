@@ -197,8 +197,8 @@ int main(int argc, char **argv){
           Eigen::Vector3d points_on_line_1 = points_on_line[0];
           Eigen::Vector3d points_on_line_2 = points_on_line[1];
 
-          if(points_on_line_1(0)<lineFit_threshold &  points_on_line_1(1)<lineFit_threshold &
-                  points_on_line_2(0)<lineFit_threshold &  points_on_line_2(1)<lineFit_threshold ) { // check whether it is reasonable
+          if(std::fabs(points_on_line_1(0))<lineFit_threshold &  std::fabs(points_on_line_1(1))<lineFit_threshold &
+                  std::fabs(points_on_line_2(0))<lineFit_threshold &  std::fabs(points_on_line_2(1))<lineFit_threshold ) { // check whether it is reasonable
             flag_push_this_ob = true;
           }
 
@@ -253,9 +253,9 @@ int main(int argc, char **argv){
 //    Tlc0(0,3) = 0.0; // -27.2/1000.0;
 //    Tlc0(1,3) = 0.0; // -15.1/1000.0;
 //    Tlc0(2,3) = 0.0; // 57.4/1000.0;
-    Tlc0(0,3) =  -27.2/1000.0;
-    Tlc0(1,3) =  -15.1/1000.0;
-    Tlc0(2,3) =  57.4/1000.0;
+    Tlc0(0,3) =  -27.2/1000.0;   // x
+    Tlc0(1,3) =  -15.1/1000.0;   // y
+    Tlc0(2,3) =  57.4/1000.0;    // z
 
     Eigen::Matrix3d m;
     m << 0, 0, 1,
@@ -268,7 +268,7 @@ int main(int argc, char **argv){
     std::cout<< Tlc0 <<std::endl;
 
   //CamLaserCalibration(obs,Tcl, false);
-  CamLaserCalibration(obs,Tcl, true, true);
+  CamLaserCalibration(obs,Tcl, false, true);     // 建议用false true 或者 true true
 
 //    std::cout << "\n----- Transform from laser to camera  Tcl is: -----\n"<<std::endl;
 //    std::cout<< Tcl <<std::endl;

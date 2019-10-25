@@ -1,0 +1,92 @@
+roscore
+roslaunch pointgrey_camera_driver camera_siasun_brenton.launch
+rosrun urg_node urg_node _ip_address:="192.168.1.10"
+rviz
+rostopic echo /camera/image_raw/height
+
+
+rosbag record /camera/image_raw /scan
+
+roslaunch lasercamcal_ros kalibra_apriltag.launch
+roslaunch lasercamcal_ros calibra_offline.launch 
+roslaunch lasercamcal_ros debug.launch
+
+kalib
+kalibr_calibrate_cameras --target april.yaml --bag 2019-10-15-20-15-30.bag --models pinhole-radtan --topics /camera/image_raw --bag-from-to 2 50
+
+
+rosrun camera_calibration cameracalibrator.py --size 8x5 --square 0.03012 image:=/camera/image_raw camera:=/camera
+
+
+
+
+
+pinhole-equi
+
+
+rosrun camera_calibration cameracalibrator.py --size 8x6 --square 0.108 image:=/my_camera/image camera:=/my_camera
+
+
+ROS_NAMESPACE=camera rosrun image_proc image_proc
+rosrun image_view image_view image:=camera/image_rect_color
+
+
+
+length of check board
+x1 195.2
+b  135.6
+a  452.0
+x2 146.0
+
+y1 266.8
+y2 152.0
+
+
+
+
+## new fisheye camera
+[image]
+
+width
+2048
+
+height
+1536
+
+[narrow_stereo]
+
+camera matrix
+1251.712414 0.000000 1058.271900
+0.000000 1254.529930 758.515553
+0.000000 0.000000 1.000000
+
+distortion
+0.345201 -0.035078 -0.000719 0.000454 0.003618 0.748087 0.000000 0.000000
+
+rectification
+1.000000 0.000000 0.000000
+0.000000 1.000000 0.000000
+0.000000 0.000000 1.000000
+
+projection
+879.634583 0.000000 1091.864285 0.000000
+0.000000 1052.963623 752.233628 0.000000
+0.000000 0.000000 1.000000 0.000000
+
+('Wrote calibration data to', '/tmp/calibrationdata.tar.gz')
+
+
+
+rosrun camera_calibration tarfile_calibration.py --size 8x5 --square 0.03012 --zero-tangent-dist image:=/camera/image_raw camera:=/camera 
+rosrun camera_calibration cameracalibrator.py --size 8x5 --square 0.03012 --k 2 --zero-tangent-dist image:=/camera/image_raw camera:=/camera
+
+
+rosbag record /camera/image_raw
+
+
+sudo chmod 666 /dev/ttyACM0
+rosrun urg_node urg_node 
+
+
+kalibr_calibrate_cameras --target april.yaml --bag 2019-10-25-10-42-16.bag --models pinhole-equi --topics /camera/image_raw --bag-from-to 5 63
+
