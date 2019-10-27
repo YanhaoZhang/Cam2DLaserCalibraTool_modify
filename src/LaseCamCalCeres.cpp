@@ -62,8 +62,7 @@ bool PointInPlaneFactor::Evaluate(double const *const *parameters, double *resid
     return true;
 }
 
-// this is for optimization on 2D plain
-//Eigen::Matrix3d pitch2Rot(const double a)
+// this is for optimization on 2D plain0  //Eigen::Matrix3d pitch2Rot(const double a)
 //{
 //    Eigen::Matrix3d ans;
 //    ans << std::cos(a), 0.0, std::sin(a),
@@ -103,6 +102,7 @@ Eigen::Matrix3d Jacobianyaw2Rot(const double a)
 // new cost function by yanhao
 // this is for aditional constraint for 2D
 //http://ceres-solver.org/analytical_derivatives.html?highlight=evaluate
+// 这里认为laser-camera的初始值之外还有一个相对laser的transform 这个transform是2D的
 class PointInPlaneFactor2D: public ceres::SizedCostFunction<1,3>
 {
 private:
@@ -122,7 +122,7 @@ public:
 };
 
 bool PointInPlaneFactor2D::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const {
-    Eigen::Vector3d t_0_l0_para(parameters[0][0], parameters[0][1], 0.0);  // x y 0
+    Eigen::Vector3d t_l_l0_para(parameters[0][0], parameters[0][1], 0.0);  // x y 0
     Eigen::Matrix3d Rl0_para = yaw2Rot(parameters[0][2]);
 
 //    tcl += tcl0_;
@@ -131,10 +131,10 @@ bool PointInPlaneFactor2D::Evaluate(double const *const *parameters, double *res
 
 //    Eigen::Matrix3d Rcl = Rcl_y*Rcl0_;
 
-    Eigen::Vector3d pt_c = Rcl0_ * (Rl0_para * (point_ + t_0_l0_para)) + tcl0_;
+    Eigen::Vector3d pt_c = Rcl0_ * (Rl0_para * point_ + t_l_l0_para) + tcl0_;
     residuals[0] = planar_.head(3).transpose() * pt_c + planar_[3];
 
-//    Eigen::Matrix3d m = Eigen::Matrix3d::Identity();
+//    Eigen::Matrix3d m = Eigen::Matrix3d::Identity();--    fvb
 //    m(2,2) = 0;
 
     if (jacobians)
@@ -145,12 +145,12 @@ bool PointInPlaneFactor2D::Evaluate(double const *const *parameters, double *res
 //            jaco_i.leftCols<2>() = planar_.head(3);
 //            jaco_i.rightCols<1>() = planar_.head(3).transpose() * (-qcl.toRotationMatrix() * skewSymmetric(point_));
 
-            Eigen::Matrix2d jacob_tmp = planar_.head(3).transpose() * Rcl0_ * Rl0_para;
+//            Eigen::Matrix2d jacob_tmp = planar_.head(3).transpose() * Rcl0_.leftCols(2);
 
 
 
-            jacobian_pose_i.leftCols<2>() = jacob_tmp.head(2);  // a b in ax+by+cz+d=0
-            jacobian_pose_i.rightCols<1>() = planar_.head(3).transpose() * Rcl0_ * (Rcl_para_jaco * (point_ + t_0_l0_para));
+            jacobian_pose_i.leftCols<2>() = planar_.head(3).transpose() * Rcl0_.leftCols(2);  // a b in ax+by+cz+d=0
+            jacobian_pose_i.rightCols<1>() = planar_.head(3).transpose() * Rcl0_ * Rcl_para_jaco* point_;
         }
 
 
@@ -694,7 +694,7 @@ void CamLaserCalibration2D(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tc
 
     }
 
-    std::cout << "Yanhao check line 669:\n";
+//    std::cout << "Yanhao check line 669:\n";
 
 //    ceres::LocalParameterization* quaternionParameterization = new ceres::QuaternionParameterization;
 //    problem.SetParameterization(q_coeffs,quaternionParameterization);
@@ -702,7 +702,7 @@ void CamLaserCalibration2D(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tc
     problem.AddParameterBlock(pose.data(), 3, local_parameterization);
 
 
-    std::cout << "Yanhao check line 677:\n";
+//    std::cout << "Yanhao check line 677:\n";
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
@@ -729,10 +729,20 @@ void CamLaserCalibration2D(const std::vector<Oberserve> obs, Eigen::Matrix4d &Tc
 //    residuals[0] = planar_.head(3).transpose() * pt_c + planar_[3];
 
 
-    Tcl.block<3,3>(0,0) = Rcl_0 * yaw2Rot(theta_opt);
+//    Eigen::Vector3d pt_c = Rcl0_ * (Rl0_para * point_ + t_l_l0_para) + tcl0_;
+//    residuals[0] = planar_.head(3).transpose() * pt_c + planar_[3];
+
+    Eigen::Matrix3d Rl0_opt = yaw2Rot(theta_opt);
+
+//    Eigen::Matrix3d Rcl_0 = Tcl.block<3,3>(0,0);
+//    Eigen::Vector3d tcl_0;
+
+    Tcl.block<3,3>(0,0) = Rcl_0 *Rl0_opt;
 
 //            yaw2Rot(theta_opt) * Rcl_0;
-    Tcl.block<3,1>(0,3) = Rcl_0 * yaw2Rot(theta_opt) * tcl_opt + tcl_0;
+    Tcl.block<3,1>(0,3) = Rcl_0 * tcl_opt + tcl_0;
+
+//            Rcl_0 * yaw2Rot(theta_opt) * tcl_opt + tcl_0;
 
 //    q = Eigen::Quaterniond(pose[6],pose[3],pose[4],pose[5]);
 //
