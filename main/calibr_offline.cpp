@@ -147,12 +147,19 @@ int main(int argc, char **argv){
         for (int i = 0; i < tagpose.size(); ++i) {
           CamPose tmp = tagpose.at(i);
           double t = fabs(tmp.timestamp - timestamp);
+
+//            std::cout<< "t = "<< t <<std::endl;
+
+
           if(t < min_dt)
           {
             min_dt = t;
             colsetTagPose = tmp;
           }
         }
+
+
+//          std::cout<< "min_dt = "<< min_dt <<std::endl;
 
 
         if(min_dt < 0.02)  // 20ms
@@ -196,6 +203,10 @@ int main(int argc, char **argv){
 
           Eigen::Vector3d points_on_line_1 = points_on_line[0];
           Eigen::Vector3d points_on_line_2 = points_on_line[1];
+
+//            std::cout<< "points_on_line_1 = "<< points_on_line_1 <<std::endl;
+//            std::cout<< "points_on_line_2 = "<< points_on_line_2 <<std::endl;
+
 
           if(std::fabs(points_on_line_1(0))<lineFit_threshold &  std::fabs(points_on_line_1(1))<lineFit_threshold &
                   std::fabs(points_on_line_2(0))<lineFit_threshold &  std::fabs(points_on_line_2(1))<lineFit_threshold ) { // check whether it is reasonable
@@ -268,7 +279,17 @@ int main(int argc, char **argv){
     std::cout<< Tlc0 <<std::endl;
 
   //CamLaserCalibration(obs,Tcl, false);
-  CamLaserCalibration(obs,Tcl, false, true);     // 建议用false true 或者 true true
+
+    bool if2Dopt = true;
+
+    if(if2Dopt) {
+        CamLaserCalibration2D(obs,Tcl, false, true);     // 建议用false true 或者 true true
+    } else {
+        CamLaserCalibration(obs,Tcl, false, true);     // 建议用false true 或者 true true
+    }
+
+
+
 
 //    std::cout << "\n----- Transform from laser to camera  Tcl is: -----\n"<<std::endl;
 //    std::cout<< Tcl <<std::endl;
